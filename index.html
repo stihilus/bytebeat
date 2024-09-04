@@ -335,7 +335,7 @@
       <canvas id="fullscreen-visualizer"></canvas>
     </div>
 
-    <script>
+<script>
     const canvas = document.getElementById('visualizer');
     const bgCanvas = document.getElementById('background-visualizer');
     const fullscreenContainer = document.getElementById('fullscreen-container');
@@ -521,17 +521,120 @@
     }
 
     function saveRecording() {
-        const blob = new Blob(audioChunks, { type: 'audio/wav' });
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
         audioChunks = [];
         
-        const audioUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = audioUrl;
-        link.download = 'bytebeat_recording.wav';
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Convert webm to wav
+        convertToWav(blob).then(wavBlob => {
+            const audioUrl = URL.createObjectURL(wavBlob);
+            const link = document.createElement('a');
+            link.href = audioUrl;
+            link.download = 'bytebeat_recording.wav';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }
+
+    function convertToWav(blob) {
+        return new Promise(resolve => {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const fileReader = new FileReader();
+
+            fileReader.onload = function(event) {
+                const arrayBuffer = event.target.result;
+                audioContext.decodeAudioData(arrayBuffer, (audioBuffer) => {
+                    const wavBlob = audioBufferToWav(audioBuffer);
+                    resolve(wavBlob);
+                });
+            };
+
+            fileReader.readAsArrayBuffer(blob);
+        });
+    }
+
+    function audioBufferToWav(audioBuffer) {
+        const numOfChan = audioBuffer.numberOfChannels;
+        const sampleRate = audioBuffer.sampleRate;
+        const format = 1; // PCM
+        const bitDepth = 16;
+
+        let result;
+        if (numOfChan === 2) {
+            result = interleave(audioBuffer.getChannelData(0), audioBuffer.getChannelData(1));
+        } else {
+            result = audioBuffer.getChannelData(0);
+        }
+
+        return encodeWAV(result, format, sampleRate, numOfChan, bitDepth);
+    }
+
+    function interleave(leftChannel, rightChannel) {
+        const length = leftChannel.length + rightChannel.length;
+        const result = new Float32Array(length);
+
+        let inputIndex = 0;
+        for (let index = 0; index < length; ) {
+            result[index++] = leftChannel[inputIndex];
+            result[index++] = rightChannel[inputIndex];
+            inputIndex++;
+        }
+        return result;
+    }
+
+    function encodeWAV(samples, format, sampleRate, numChannels, bitDepth) {
+        const bytesPerSample = bitDepth / 8;
+        const blockAlign = numChannels * bytesPerSample;
+
+        const buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
+        const view = new DataView(buffer);
+
+        // RIFF identifier
+        writeString(view, 0, 'RIFF');
+        // RIFF chunk length
+        view.setUint32(4, 36 + samples.length * bytesPerSample, true);
+        // RIFF type
+        writeString(view, 8, 'WAVE');
+        // Format chunk identifier
+        writeString(view, 12, 'fmt ');
+        // Format chunk length
+        view.setUint32(16, 16, true);
+        // Sample format (raw)
+        view.setUint16(20, format, true);
+        // Channel count
+        view.setUint16(22, numChannels, true);
+        // Sample rate
+        view.setUint32(24, sampleRate, true);
+        // Byte rate (sample rate * block align)
+        view.setUint32(28, sampleRate * blockAlign, true);
+        // Block align (channel count * bytes per sample)
+        view.setUint16(32, blockAlign, true);
+        // Bits per sample
+        view.setUint16(34, bitDepth, true);
+        // Data chunk identifier
+        writeString(view, 36, 'data');
+        // Data chunk length
+        view.setUint32(40, samples.length * bytesPerSample, true);
+
+        if (format === 1) { // Raw PCM
+            floatTo16BitPCM(view, 44, samples);
+        }
+
+        return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    }
+
+    function floatTo16BitPCM(output, offset, input) {
+        for (let i = 0; i < input.length; i++, offset += 2) {
+            const s = Math.max(-1, Math.min(1, input[i]));
+            output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
     }
 
     function toggleRecording() {
