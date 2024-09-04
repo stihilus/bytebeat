@@ -164,6 +164,15 @@
             width: 100%;
             height: 100%;
         }
+        #playRecButton {
+        background-color: #FF0000;
+        margin-left: 10px;
+        width: auto;
+        padding: 10px 15px;
+        } 
+        #playRecButton:hover {
+        background-color: #CC0000;
+        }
     </style>
   </head>
   <body>
@@ -193,8 +202,8 @@
         id="volume"
       />
       <button id="playPause">Play</button>
+      <button id="playRecButton">Play & Rec</button>
       <button id="fullscreenButton">Full Screen</button>
-
       <div class="tutorial">
   <h2>Hey there, welcome to the wild world of Bytebeat!</h2>
   <p>
@@ -341,6 +350,7 @@
     const presetSelect = document.getElementById('preset');
     const volumeSlider = document.getElementById('volume');
     const playPauseButton = document.getElementById('playPause');
+    const playRecButton = document.getElementById('playRecButton');
     const fullscreenButton = document.getElementById('fullscreenButton');
 
     let isPlaying = false;
@@ -349,6 +359,9 @@
     let scriptNode;
     let t = 0;
     let animationFrameId;
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
 
     // Function to get formula from URL
     function getFormulaFromURL() {
@@ -407,6 +420,9 @@
     }
 
     function stopAudio() {
+        if (isRecording) {
+            stopRecording();
+        }
         if (scriptNode) {
             scriptNode.disconnect();
         }
@@ -480,7 +496,61 @@
         }
     }
 
+    function startRecording() {
+        const audioDestination = audioContext.createMediaStreamDestination();
+        scriptNode.connect(audioDestination);
+        
+        mediaRecorder = new MediaRecorder(audioDestination.stream);
+        
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = saveRecording;
+        
+        mediaRecorder.start();
+        isRecording = true;
+        playRecButton.textContent = 'Stop Rec';
+        playRecButton.style.backgroundColor = '#00FF00';
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+            isRecording = false;
+            playRecButton.textContent = 'Play & Rec';
+            playRecButton.style.backgroundColor = '#FF0000';
+        }
+    }
+
+    function saveRecording() {
+        const blob = new Blob(audioChunks, { type: 'audio/wav' });
+        audioChunks = [];
+        
+        const audioUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = audioUrl;
+        link.download = 'bytebeat_recording.wav';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function toggleRecording() {
+        if (!isPlaying) {
+            startAudio();
+        }
+        
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    }
+
     playPauseButton.addEventListener('click', togglePlay);
+    playRecButton.addEventListener('click', toggleRecording);
     fullscreenButton.addEventListener('click', toggleFullscreen);
     fullscreenContainer.addEventListener('click', toggleFullscreen);
 
@@ -513,6 +583,6 @@
         stopAudio();
         cancelAnimationFrame(animationFrameId);
     });
-    </script>
+</script>
   </body>
 </html>
