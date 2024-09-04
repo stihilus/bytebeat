@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<!-- main font: https://departuremono.com/ -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bytebeat Synthesizer</title>
+    <style>
+        @font-face {
+            font-family: 'Departure Mono';
+            src: url('DepartureMono-Regular.otf') format('opentype');
+        }
+        body {
+            font-family: 'Departure Mono', monospace;
+            background-color: #1a1a1a;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2, h3 {
+            color: #FF5C00;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        h1 {
+            font-size: 1.3em;
+        }
+        h2 {
+            font-size: 1.1em;
+        }
+        h3 {
+            font-size: 1.1em;
+        }
+        a:link, a:visited, a:hover, a:active {
+          color: #FF5C00;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #373737;
+            border: 1px solid #494949;
+            color: white;
+            font-family: 'Departure Mono', monospace;
+            border-radius: 0px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: none;
+            color: white;
+            font-family: 'Departure Mono', monospace;
+            border-radius: 4px;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        #playPause {
+            background-color: #FF5C00;
+        }
+        
+        #playPause:hover {
+            background-color: #cc4a00;
+        }
+        
+        #fullscreenButton {
+            background-color: #4a4a4a;
+        }
+        
+        #fullscreenButton:hover {
+            background-color: #5a5a5a;
+        }
+        button:hover {
+            background-color: #cc4a00;
+        }
+        canvas {
+            width: 100%;
+            border: 1px solid #808080;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        .slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 15px;
+            background: #373737;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+            margin-bottom: 10px;
+            border-radius: 2px;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            background: #FF5C00;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            background: #FF5C00;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .tutorial {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: rgba(42, 42, 42, 0.8);
+            border-radius: 4px;
+        }
+        pre {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: 'Departure Mono', monospace;
+            color: #FF5C00;
+        }
+        #background-visualizer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+            z-index: -1;
+        }
+        #fullscreen-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+            z-index: 1000;
+        }
+        #fullscreen-visualizer {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+  </head>
+  <body>
+    <canvas id="background-visualizer"></canvas>
+    <div class="container">
+      <h1>bytebeat synthesizer</h1>
+      <canvas id="visualizer" width="320" height="200"></canvas>
+      <div class="label">Formula:</div>
+      <input type="text" id="formula" placeholder="Enter bytebeat formula" />
+      <div class="label">Preset:</div>
+      <select id="preset">
+        <option value="">Select a preset</option>
+        <option value="(t * 5 & t >> 7) | (t * 3 & t >> 10)">Classic</option>
+        <option value="t * (t>>11 & t>>8 & 123 & t>>3)">Arpeggiator</option>
+        <option value="t | t % 255 | t % 257">Glitch</option>
+        <option value="t * (t>>8 | t | t>>9 | t>>13) & t >> 8">Bubbles</option>
+        <option value="t * (t >> 5 | t >> 8) >> (t >> 16)">Bit Crush</option>
+      </select>
+      <div class="label">Volume:</div>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value="0.1"
+        class="slider"
+        id="volume"
+      />
+      <button id="playPause">Play</button>
+      <button id="fullscreenButton">Full Screen</button>
+
+      <div class="tutorial">
+  <h2>Hey there, welcome to the wild world of Bytebeat!</h2>
+  <p>
+    Before we dive in, I've got to give a massive shoutout to <a href="http://viznut.fi/" target="_blank">Viznut</a> (aka Ville-Matias Heikkilä).His groundbreaking work inspires this whole project in Bytebeat. If you're curious about the origins of this mind-bending audio technique, definitely check out his stuff!
+  </p>
+
+  <h3>So, what the heck is Bytebeat?</h3>
+  <p>
+    Imagine creating music with math. Sounds crazy, right? Well, that's Bytebeat in a nutshell. It's like cooking up audio using really short recipes made of numbers and symbols. Each "ingredient" (or sample) of sound comes from solving a tiny math puzzle. Cool, huh?
+  </p>
+
+  <h3>The Building Blocks</h3>
+  <p>Here's what we're playing with:</p>
+  <ul>
+    <li><code>t</code>: Think of this as the clock of our weird little audio universe. It keeps ticking up as time passes.</li>
+    <li>Bitwise operations: These are like secret handshakes for numbers. We've got <code>&</code> (AND), <code>|</code> (OR), <code>^</code> (XOR), <code>~</code> (NOT), <code>&lt;&lt;</code> (left shift), and <code>&gt;&gt;</code> (right shift).</li>
+    <li>The usual math suspects: Addition (<code>+</code>), subtraction (<code>-</code>), multiplication (<code>*</code>), division (<code>/</code>), and that quirky remainder thing (<code>%</code>, aka modulo).</li>
+  </ul>
+
+  <h3>Let's Make Some Noise!</h3>
+  <p>Ready to try your hand at this? Let's start simple:</p>
+  <pre><code>t & t >> 8</code></pre>
+  <p>
+    Go ahead, paste that into the formula box up there and hit play. Sounds like a grumpy robot, doesn't it? That's your first Bytebeat! Here's what's happening:
+  </p>
+  <ul>
+    <li><code>t >> 8</code> is shifting the bits of <code>t</code> to the right by 8 positions. This creates a slower-changing version of <code>t</code>.</li>
+    <li><code>&</code> then combines this slower version with the original <code>t</code>, creating a rhythmic pattern.</li>
+  </ul>
+
+  <h3>Time to Get Weird</h3>
+  <p>
+    Now that you've got the basics, let's crank it up a notch:
+  </p>
+  <pre><code>(t * 5 & t >> 7) | (t * 3 & t >> 10)</code></pre>
+  <p>
+    This bad boy is like two beats having an argument. Here's the breakdown:
+  </p>
+  <ul>
+    <li><code>t * 5</code> and <code>t * 3</code> create two different "melodies"</li>
+    <li><code>t >> 7</code> and <code>t >> 10</code> create two different rhythms</li>
+    <li>The <code>&</code> operations combine each melody with its rhythm</li>
+    <li>Finally, <code>|</code> mixes these two patterns together</li>
+  </ul>
+
+  <h3>Pro-Gamer Moves</h3>
+  <p>
+    1. Want to sound like a malfunctioning synthesizer? Try this FM-style madness:
+  </p>
+  <pre><code>t * t >> 8 & 63</code></pre>
+  <p>
+    This creates a frequency modulation effect:
+  </p>
+  <ul>
+    <li><code>t * t</code> gives us a rapidly increasing value</li>
+    <li><code>>> 8</code> brings it back into a reasonable range</li>
+    <li><code>& 63</code> keeps our values between 0 and 63, creating a repeating pattern</li>
+  </ul>
+
+  <p>2. How about some bleepy-bloopy arpeggios?</p>
+  <pre><code>t * (t>>11 & t>>8 & 123 & t>>3)</code></pre>
+  <p>
+    This creates a complex, arpeggio-like sound:
+  </p>
+  <ul>
+    <li><code>t>>11</code>, <code>t>>8</code>, and <code>t>>3</code> create different rhythmic patterns</li>
+    <li><code>& 123</code> adds some tonal variation</li>
+    <li>Multiplying by <code>t</code> at the end gives us our rising and falling tones</li>
+  </ul>
+
+  <p>
+    3. Let's wrap that sound in a cozy envelope:
+  </p>
+  <pre><code>t * ((t>>12 | t>>8) & 63 & t>>4)</code></pre>
+  <p>
+    This creates a sound with a more complex envelope:
+  </p>
+  <ul>
+    <li><code>t>>12 | t>>8</code> creates a pattern of different lengths</li>
+    <li><code>& 63</code> keeps our values in a specific range</li>
+    <li><code>& t>>4</code> adds a slower-changing element to our envelope</li>
+    <li>Multiplying by <code>t</code> gives us our base tone</li>
+  </ul>
+
+  <h3>Even More Bytebeat Magic</h3>
+  <p>4. Want a funky bassline? Try this:</p>
+  <pre><code>(t<<1)^((t<<1)+(t>>7)&t>>12)|(t>>4)</code></pre>
+  <p>
+    This formula creates a complex, funky bass sound:
+  </p>
+  <ul>
+    <li><code>t<<1</code> doubles the frequency of our base tone</li>
+    <li><code>(t<<1)+(t>>7)&t>>12</code> creates a rhythmic pattern</li>
+    <li>The <code>^</code> (XOR) operation combines these for a unique timbre</li>
+    <li><code>| (t>>4)</code> adds a slower-changing element for variety</li>
+  </ul>
+
+  <p>5. How about some chip-tune style music?</p>
+  <pre><code>t * ((t>>9 | t>>13) & 15) & 129</code></pre>
+  <p>
+    This formula gives us a sound reminiscent of old-school video game music:
+  </p>
+  <ul>
+    <li><code>t>>9 | t>>13</code> creates a pattern of different note lengths</li>
+    <li><code>& 15</code> limits this to 16 different values, creating a scale-like effect</li>
+    <li><code>& 129</code> adds a rhythmic on/off pattern to our sound</li>
+    <li>Multiplying by <code>t</code> gives us our base frequency</li>
+  </ul>
+
+  <h3>Go Forth and Make Some Noise!</h3>
+  <p>
+    The best way to get this stuff? Just mess around! Tweak those formulas, smoosh different techniques together, see what kind of beautiful chaos you can create. Try changing some numbers, swapping operators, or combining parts of different formulas. Remember, there's no such thing as a mistake in Bytebeat – sometimes the coolest sounds come from happy accidents!
+  </p>
+
+  <h3>Want to Dive Deeper?</h3>
+  <p>
+    If you're hungry for more Bytebeat goodness, check out these awesome resources:
+  </p>
+  <ul>
+    <li><a href="http://www.pouet.net/topic.php?which=8357" target="_blank">Pouet.net's Bytebeat Thread</a> - Where the cool kids hang out</li>
+    <li><a href="http://viznut.fi/demos/unix/bytebeat_formulas.txt" target="_blank">Viznut's Formula Goldmine</a> - More formulas than you can shake a stick at</li>
+    <li><a href="https://github.com/greggman/html5bytebeat" target="_blank">HTML5 Bytebeat on GitHub</a> - For when you want to get your hands dirty</li>
+    <li><a href="https://llllllll.co/t/bytebeats-a-beginners-guide-general/31104" target="_blank">Bytebeats - A Beginner's Guide on lines</a> - Perfect for newbies</li>
+    <li><a href="https://nightmachines.tv/downloads/Bytebeats_Beginners_Guide_TTNM_v1-5.pdf" target="_blank">The Night's Machines Bytebeat Guide</a> - A deep dive into the madness</li>
+    <li><a href="http://countercomplex.blogspot.com/" target="_blank">Viznut's Blog</a> - Where it all began</li>
+    <li><a href="http://viznut.fi/texts-en/bytebeat_algorithmic_symphonies.html" target="_blank">Algorithmic Symphonies from One Line of Code</a> - Mind-bending stuff</li>
+  </ul>
+</div>
+    </div>
+
+    <div id="fullscreen-container">
+      <canvas id="fullscreen-visualizer"></canvas>
+    </div>
+
+    <script>
+    const canvas = document.getElementById('visualizer');
+    const bgCanvas = document.getElementById('background-visualizer');
+    const fullscreenContainer = document.getElementById('fullscreen-container');
+    const fullscreenCanvas = document.getElementById('fullscreen-visualizer');
+    const ctx = canvas.getContext('2d');
+    const bgCtx = bgCanvas.getContext('2d');
+    const fsCtx = fullscreenCanvas.getContext('2d');
+    const formulaInput = document.getElementById('formula');
+    const presetSelect = document.getElementById('preset');
+    const volumeSlider = document.getElementById('volume');
+    const playPauseButton = document.getElementById('playPause');
+    const fullscreenButton = document.getElementById('fullscreenButton');
+
+    let isPlaying = false;
+    let isFullscreen = false;
+    let audioContext;
+    let scriptNode;
+    let t = 0;
+    let animationFrameId;
+
+    // Function to get formula from URL
+    function getFormulaFromURL() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('formula') || '(t * 5 & t >> 7) | (t * 3 & t >> 10)';
+    }
+
+    // Function to update URL with current formula
+    function updateURL(formula) {
+        const url = new URL(window.location);
+        url.searchParams.set('formula', formula);
+        window.history.pushState({}, '', url);
+    }
+
+    // Initialize formula from URL
+    formulaInput.value = getFormulaFromURL();
+
+    function resizeCanvas() {
+        bgCanvas.width = window.innerWidth;
+        bgCanvas.height = window.innerHeight;
+        fullscreenCanvas.width = window.innerWidth;
+        fullscreenCanvas.height = window.innerHeight;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function togglePlay() {
+        if (isPlaying) {
+            stopAudio();
+        } else {
+            startAudio();
+        }
+    }
+
+    function startAudio() {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
+
+        scriptNode.onaudioprocess = (audioProcessingEvent) => {
+            const outputBuffer = audioProcessingEvent.outputBuffer;
+            const outputData = outputBuffer.getChannelData(0);
+
+            for (let sample = 0; sample < outputBuffer.length; sample++) {
+                const formula = formulaInput.value;
+                const bytebeatFunction = new Function('t', `return ${formula}`);
+                const value = bytebeatFunction(t) & 0xff;
+                outputData[sample] = (value / 128.0 - 1) * volumeSlider.value;
+                t++;
+            }
+        };
+
+        scriptNode.connect(audioContext.destination);
+        isPlaying = true;
+        playPauseButton.textContent = 'Stop';
+    }
+
+    function stopAudio() {
+        if (scriptNode) {
+            scriptNode.disconnect();
+        }
+        if (audioContext) {
+            audioContext.close();
+        }
+        isPlaying = false;
+        playPauseButton.textContent = 'Play';
+    }
+
+    function updateVisualization() {
+        const activeCanvas = isFullscreen ? fullscreenCanvas : canvas;
+        const activeCtx = isFullscreen ? fsCtx : ctx;
+
+        activeCtx.clearRect(0, 0, activeCanvas.width, activeCanvas.height);
+        bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+        
+        if (isPlaying) {
+            const formula = formulaInput.value;
+            const bytebeatFunction = new Function('t', `return ${formula}`);
+            
+            // Main visualizer
+            const pixelSize = isFullscreen ? 16 : 8;
+            const cols = activeCanvas.width / pixelSize;
+            const rows = activeCanvas.height / pixelSize;
+
+            for (let i = 0; i < cols; i++) {
+                for (let j = 0; j < rows; j++) {
+                    const value = bytebeatFunction(t + i + j * cols) & 0xff;
+                    activeCtx.fillStyle = `rgb(${value}, ${value}, ${value})`;
+                    activeCtx.fillRect(i * pixelSize, j * pixelSize, pixelSize, pixelSize);
+                }
+            }
+
+            // Print formula in center of canvas
+            activeCtx.fillStyle = 'white';
+            activeCtx.font = isFullscreen ? '24px "Departure Mono", monospace' : '12px "Departure Mono", monospace';
+            activeCtx.textAlign = 'center';
+            activeCtx.textBaseline = 'middle';
+            activeCtx.fillText(formula, activeCanvas.width / 2, activeCanvas.height / 2);
+
+            // Background visualizer
+            const bgPixelSize = 16;
+            const bgCols = bgCanvas.width / bgPixelSize;
+            const bgRows = bgCanvas.height / bgPixelSize;
+
+            for (let i = 0; i < bgCols; i++) {
+                for (let j = 0; j < bgRows; j++) {
+                    const value = bytebeatFunction(t + i + j * bgCols) & 0xff;
+                    bgCtx.fillStyle = `rgba(${value}, ${value}, ${value}, 0.3)`;
+                    bgCtx.fillRect(i * bgPixelSize, j * bgPixelSize, bgPixelSize, bgPixelSize);
+                }
+            }
+        }
+        animationFrameId = requestAnimationFrame(updateVisualization);
+    }
+
+    function toggleFullscreen() {
+        isFullscreen = !isFullscreen;
+        if (isFullscreen) {
+            fullscreenContainer.style.display = 'block';
+        } else {
+            fullscreenContainer.style.display = 'none';
+        }
+        resizeCanvas();
+    }
+
+    function exitFullscreen() {
+        if (isFullscreen) {
+            toggleFullscreen();
+        }
+    }
+
+    playPauseButton.addEventListener('click', togglePlay);
+    fullscreenButton.addEventListener('click', toggleFullscreen);
+    fullscreenContainer.addEventListener('click', toggleFullscreen);
+
+    // Add event listener for ESC key
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            exitFullscreen();
+        }
+    });
+
+    presetSelect.addEventListener('change', (e) => {
+        if (e.target.value) {
+            formulaInput.value = e.target.value;
+            updateURL(e.target.value);
+        }
+    });
+
+    formulaInput.addEventListener('input', () => {
+        updateURL(formulaInput.value);
+        if (isPlaying) {
+            updateVisualization();
+        }
+    });
+
+    // Start visualization loop
+    updateVisualization();
+
+    // Clean up resources when the page is unloaded
+    window.addEventListener('unload', () => {
+        stopAudio();
+        cancelAnimationFrame(animationFrameId);
+    });
+    </script>
+  </body>
+</html>
